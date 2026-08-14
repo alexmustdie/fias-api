@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск адресов — ФИАС</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .fade-in { animation: fadeIn 200ms ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .drop-zone.drag-over {
+            background-color: #F3F4F6 !important;
+            border-color: #111827 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-300 px-6 py-4">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-semibold"> </h1>
+            <nav class="flex items-center gap-6">
+                <a href="#" class="text-sm font-semibold text-gray-600 hover:underline hover:text-gray-900 transition-colors duration-200">
+                    Справка
+                </a>
+                <!-- <div class="w-px h-4 bg-gray-300"></div> -->
+                <span class="text-sm font-semibold text-gray-900"> </span>
+                <button class="text-sm font-semibold text-gray-600 hover:text-red-600 hover:underline transition-colors duration-200">
+                     
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="max-w-6xl mx-auto px-6 py-10">
+        <!-- Заголовок страницы -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-semibold mb-2">Создание отчета</h2>
+            <p class="text-sm text-gray-500">
+                Загрузите Excel-файл с адресами для нормализации через сервис ФИАС
+            </p>
+        </div>
+
+        <!-- Карточка загрузки -->
+        <div class="bg-white border border-gray-300 p-8 mb-6">
+            <h3 class="text-xl font-semibold mb-6">Загрузка файла</h3>
+
+            <!-- Drop zone -->
+            <div
+                id="dropZone"
+                class="drop-zone border border-gray-300 bg-white p-12 text-center cursor-pointer hover:bg-gray-100 hover:border-gray-900 transition-colors duration-200"
+            >
+                <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+                <div id="uploadPrompt">
+                    <svg class="mx-auto mb-4" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="1.5">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p class="text-sm font-semibold text-gray-900 mb-1">
+                        Перетащите файл сюда или нажмите для выбора
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        Поддерживаются форматы .xlsx, .xls
+                    </p>
+                </div>
+                <div id="fileInfo" class="hidden">
+                    <svg class="mx-auto mb-4" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    <p class="text-sm font-semibold text-gray-900 mb-1" id="fileName"></p>
+                    <p class="text-xs text-gray-500" id="fileSize"></p>
+                    <button
+                        type="button"
+                        id="clearFileBtn"
+                        class="mt-4 text-xs font-semibold text-gray-600 hover:text-red-600 hover:underline transition-colors duration-200"
+                    >
+                        Удалить файл
+                    </button>
+                </div>
+            </div>
+
+            <!-- Требования к файлу -->
+            <div class="mt-6 p-4 bg-gray-50 border border-gray-300">
+                <p class="text-xs font-semibold text-gray-900 mb-2">Требования к файлу:</p>
+                <ul class="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                    <li>Первая колонка — <span class="font-semibold">id</span> (уникальный идентификатор)</li>
+                    <li>Вторая колонка — <span class="font-semibold">address</span> (адрес для нормализации)</li>
+                    <li>Максимальный размер файла: 10 МБ</li>
+                    <li>Лимит сервиса: 10 000 запросов в день</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Кнопка создания отчёта -->
+        <div class="mb-6">
+            <button
+                id="generateBtn"
+                disabled
+                class="w-full bg-gray-900 text-white text-sm font-semibold py-3 hover:bg-gray-700 active:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
+            >
+                Создать отчет
+            </button>
+        </div>
+
+        <!-- Прогресс -->
+        <div id="progressSection" class="hidden bg-white border border-gray-300 p-8 mb-6 fade-in">
+            <h3 class="text-xl font-semibold mb-6">Обработка</h3>
+            <div class="mb-3 flex justify-between text-xs text-gray-600">
+                <span id="progressLabel">Обработка адресов...</span>
+                <span id="progressPercent">0%</span>
+            </div>
+            <div class="w-full bg-gray-100 border border-gray-300 h-2">
+                <div
+                    id="progressBar"
+                    class="bg-gray-900 h-full transition-all duration-300"
+                    style="width: 0%"
+                ></div>
+            </div>
+            <p id="progressStatus" class="text-xs text-gray-500 mt-3">
+                Подключение к сервису ФИАС...
+            </p>
+        </div>
+
+        <!-- Результаты -->
+        <div id="resultsSection" class="hidden bg-white border border-gray-300 fade-in">
+            <div class="p-8 border-b border-gray-300">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-xl font-semibold">Результаты</h3>
+                        <p class="text-sm text-gray-500 mt-1" id="resultsSummary"></p>
+                    </div>
+                    <button
+                        id="downloadBtn"
+                        class="bg-gray-900 text-white text-sm font-semibold px-6 py-3 hover:bg-gray-700 active:bg-gray-800 transition-colors duration-200"
+                    >
+                        Скачать Excel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Статистика -->
+            <div class="grid grid-cols-3 border-b border-gray-300">
+                <div class="p-6 border-r border-gray-300">
+                    <p class="text-xs text-gray-500 mb-2">Всего обработано</p>
+                    <p class="text-3xl font-semibold" id="statTotal">0</p>
+                </div>
+                <div class="p-6 border-r border-gray-300">
+                    <p class="text-xs text-gray-500 mb-2">Успешно</p>
+                    <p class="text-3xl font-semibold text-gray-900" id="statSuccess">0</p>
+                </div>
+                <div class="p-6">
+                    <p class="text-xs text-gray-500 mb-2">С ошибками</p>
+                    <p class="text-3xl font-semibold text-gray-900" id="statErrors">0</p>
+                </div>
+            </div>
+
+            <!-- Таблица результатов -->
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-100 border-b border-gray-300">
+                        <tr>
+                            <th class="px-4 py-4 text-left text-xs font-semibold text-gray-700">ID</th>
+                            <th class="px-4 py-4 text-left text-xs font-semibold text-gray-700">Нормализованный адрес</th>
+                            <th class="px-4 py-4 text-left text-xs font-semibold text-gray-700">Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTable" class="divide-y divide-gray-200">
+                        <!-- Строки добавляются через JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Ошибки -->
+        <div id="errorSection" class="hidden bg-white border border-gray-300 p-8 fade-in">
+            <div class="flex items-start gap-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="1.5" class="flex-shrink-0 mt-1">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <div>
+                    <h3 class="text-xl font-semibold text-red-600 mb-2">Ошибка</h3>
+                    <p id="errorMessage" class="text-sm text-gray-600"></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadPrompt = document.getElementById('uploadPrompt');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const clearFileBtn = document.getElementById('clearFileBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const progressSection = document.getElementById('progressSection');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressLabel = document.getElementById('progressLabel');
+        const progressStatus = document.getElementById('progressStatus');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsTable = document.getElementById('resultsTable');
+        const errorSection = document.getElementById('errorSection');
+        const errorMessage = document.getElementById('errorMessage');
+
+        let selectedFile = null;
+        let resultFileUrl = null;
+
+        // Format file size
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' Б';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+        }
+
+        // Validate file
+        function validateFile(file) {
+            const validTypes = [
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel',
+            ];
+            const validExtensions = ['.xlsx', '.xls'];
+
+            const hasValidExtension = validExtensions.some(ext =>
+                file.name.toLowerCase().endsWith(ext)
+            );
+
+            if (!hasValidExtension && !validTypes.includes(file.type)) {
+                showError('Неподдерживаемый формат. Загрузите .xlsx или .xls');
+                return false;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showError('Файл слишком большой. Максимум 10 МБ');
+                return false;
+            }
+
+            return true;
+        }
+
+        // Show file info
+        function showFile(file) {
+            selectedFile = file;
+            uploadPrompt.classList.add('hidden');
+            fileInfo.classList.remove('hidden');
+            fileName.textContent = file.name;
+            fileSize.textContent = formatSize(file.size);
+            generateBtn.disabled = false;
+            hideError();
+            resultsSection.classList.add('hidden');
+        }
+
+        // Clear file
+        function clearFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            uploadPrompt.classList.remove('hidden');
+            fileInfo.classList.add('hidden');
+            generateBtn.disabled = true;
+            resultsSection.classList.add('hidden');
+        }
+
+        // Show error
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorSection.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorSection.classList.add('hidden');
+        }
+
+        // Drop zone events
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && validateFile(file)) {
+                showFile(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && validateFile(file)) {
+                showFile(file);
+            }
+        });
+
+        clearFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearFile();
+        });
+
+        // Generate report
+        generateBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            hideError();
+            resultsSection.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+            generateBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                progressStatus.textContent = 'Загрузка файла на сервер...';
+                updateProgress(5);
+
+                const response = await fetch('/api/start_process', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ detail: 'Ошибка сервера' }));
+                    throw new Error(error.detail || `HTTP ${response.status}`);
+                }
+
+                updateProgress(10);
+                progressStatus.textContent = 'Обработка адресов через ФИАС...';
+
+                // Polling для отслеживания прогресса (если API возвращает task_id)
+                const data = await response.json();
+
+                if (data.task_id) {
+                    await pollTask(data.task_id);
+                } else {
+                    updateProgress(100);
+                    progressStatus.textContent = 'Готово!';
+                    showResults(data);
+                }
+
+            } catch (error) {
+                progressSection.classList.add('hidden');
+                generateBtn.disabled = false;
+                showError(error.message || 'Произошла ошибка при обработке');
+            }
+        });
+
+        // Polling для длинных задач
+        async function pollTask(taskId) {
+            const startTime = Date.now();
+            const MAX_DURATION_MS = 3 * 60 * 60 * 1000; // 3 часа в миллисекундах
+
+            /**
+             * Возвращает интервал опроса в зависимости от прошедшего времени
+             */
+            function getInterval(elapsedMs) {
+                const elapsedSec = elapsedMs / 1000;
+                if (elapsedSec < 3 * 60) return 2000;       // до 3 мин — 2 сек
+                if (elapsedSec < 10 * 60) return 10000;     // 3–10 мин — 10 сек
+                if (elapsedSec < 30 * 60) return 20000;     // 10–30 мин — 20 сек
+                return 30000;                                // 30 мин–3 часа — 30 сек
+            }
+
+            /**
+             * Форматирует время
+             */
+            function formatElapsed(ms) {
+                const sec = Math.floor(ms / 1000);
+                const h = Math.floor(sec / 3600);
+                const m = Math.floor((sec % 3600) / 60);
+                const s = sec % 60;
+                if (h > 0) return `${h}ч ${m}м`;
+                if (m > 0) return `${m}м ${s}с`;
+                return `${s}с`;
+            }
+
+            while (true) {
+                const elapsed = Date.now() - startTime;
+
+                // Проверка максимального времени ожидания
+                if (elapsed >= MAX_DURATION_MS) {
+                    throw new Error('Превышено время ожидания (3 часа)');
+                }
+
+                const interval = getInterval(elapsed);
+                await new Promise(r => setTimeout(r, interval));
+
+                try {
+                    const response = await fetch(`/api/tasks/${taskId}`);
+                    const data = await response.json();
+
+                    if (data.status === 'completed') {
+                        updateProgress(100);
+                        progressStatus.textContent = 'Готово!';
+                        showResults(data.result);
+                        return;
+                    }
+
+                    if (data.status === 'failed') {
+                        throw new Error(data.error || 'Ошибка обработки');
+                    }
+
+                    // Прогресс-бар: 40% (загрузка) + 60% (обработка)
+                    const progress = 10 + (data.progress || 0) * 0.9;
+                    updateProgress(progress);
+
+                    // Статус с информацией о прошедшем времени и следующем опросе
+                    const nextInterval = getInterval(Date.now() - startTime) / 1000;
+                    // progressStatus.textContent =
+                    //     `Обработано ${data.processed || 0} из ${data.total || '?'}... ` +
+                    //     `(${formatElapsed(elapsed)} прошло, опрос каждые ${nextInterval}с)`;
+
+                } catch (error) {
+                    // Сетевые ошибки игнорируем — пробуем снова
+                    if (error.message !== 'Failed to fetch') {
+                        throw error;
+                    }
+                }
+            }
+        }
+
+        function updateProgress(percent) {
+            percent = Math.min(100, Math.max(0, percent));
+            progressBar.style.width = percent + '%';
+            progressPercent.textContent = Math.round(percent) + '%';
+        }
+
+        function showResults(data) {
+            progressSection.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+            generateBtn.disabled = false;
+
+            // Статистика
+            const total = data.processed || data.results?.length || 0;
+            const errors = data.errors || 0;
+            const success = total - errors;
+            const statusColors = {
+                'OK': 'bg-gray-100 text-gray-700',
+                'Требует внимания': 'bg-yellow-100 text-yellow-800',
+                'Требует проверки': 'bg-yellow-100 text-yellow-800',
+                // 'Требует проверки': 'bg-orange-100 text-orange-800',
+                'Адрес не найден': 'bg-red-100 text-red-800',
+            };
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statSuccess').textContent = success;
+            document.getElementById('statErrors').textContent = errors;
+            document.getElementById('resultsSummary').textContent =
+                `Отчет сформирован. Обработано: ${total}, успешно: ${success}, с ошибками: ${errors}`;
+
+            // Таблица
+            resultsTable.innerHTML = '';
+            const results = data.results || [];
+            results.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+
+                const statusBadge = item.error
+                    ? `<span class="inline-block text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300 px-3 py-1">Ошибка</span>`
+                    : `<span class="inline-block text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300 px-3 py-1">OK</span>`;
+                const status = item.status || 'OK';
+                const statusClass = statusColors[status] || 'bg-gray-100 text-gray-700';
+
+                tr.innerHTML = `
+                    <td class="px-4 py-4 text-sm text-gray-900">${item.id || ''}</td>
+                    <td class="px-4 py-4 text-sm text-gray-600">${item.full_address || item.error || ''}</td>
+                    <td class="px-4 py-4">
+                        <span class="inline-block text-xs font-semibold ${statusClass} border border-gray-300 px-3 py-1">
+                            ${status}
+                        </span>
+                    </td>
+                `;
+                resultsTable.appendChild(tr);
+            });
+
+            // URL для скачивания
+            resultFileUrl = data.download_url;
+            downloadBtn.onclick = () => {
+                if (resultFileUrl) {
+                    window.location.href = resultFileUrl;
+                }
+            };
+        }
+    </script>
+</body>
+</html>
