@@ -1,0 +1,16 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+ENV TZ=Europe/Moscow
+RUN ln -snf /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
+    echo "Europe/Moscow" > /etc/timezone
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+ENV NETWORK_INPUT_DIR=/data/input
+ENV NETWORK_OUTPUT_DIR=/data/output
+
+CMD ["python", "entrypoint.py"]
